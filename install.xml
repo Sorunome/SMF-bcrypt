@@ -1,0 +1,429 @@
+<?xml version="1.0"?>
+<!DOCTYPE modification SYSTEM "http://www.simplemachines.org/xml/modification">
+<modification xmlns="http://www.simplemachines.org/xml/modification" xmlns:smf="http://www.simplemachines.org/">
+	<id>Sorunome:bcrypt</id>
+	<version>0.1</version>
+	<file name="$sourcedir/Load.php">
+		<operation>
+			<search position="replace"><![CDATA[	if (empty($id_member) && isset($_COOKIE[$cookiename]))
+	{
+		// Fix a security hole in PHP 4.3.9 and below...
+		if (preg_match('~^a:[34]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:(0|40):"([a-fA-F0-9]{40})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~i', $_COOKIE[$cookiename]) == 1)
+		{
+			list ($id_member, $password) = safe_unserialize($_COOKIE[$cookiename]);
+			$id_member = !empty($id_member) && strlen($password) > 0 ? (int) $id_member : 0;
+		}
+		else
+			$id_member = 0;
+	}
+	elseif (empty($id_member) && isset($_SESSION['login_' . $cookiename]) && ($_SESSION['USER_AGENT'] == $_SERVER['HTTP_USER_AGENT'] || !empty($modSettings['disableCheckUA'])))
+	{
+		// !!! Perhaps we can do some more checking on this, such as on the first octet of the IP?
+		list ($id_member, $password, $login_span) = safe_unserialize($_SESSION['login_' . $cookiename]);
+		$id_member = !empty($id_member) && strlen($password) == 40 && $login_span > time() ? (int) $id_member : 0;
+	}]]></search>
+			<add><![CDATA[	if (empty($id_member) && isset($_COOKIE[$cookiename]))
+	{
+		// Fix a security hole in PHP 4.3.9 and below...
+		if (preg_match('~^a:[345]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:(0|32):"([a-fA-F0-9]{32})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?(i:4;i:\d+;)?\}$~i', $_COOKIE[$cookiename]) == 1)
+		{
+			list ($id_member, $password, $login_span, $cookie_state, $cookie_id) = safe_unserialize($_COOKIE[$cookiename]);
+			$id_member = !empty($id_member) && strlen($password) > 0 ? (int) $id_member : 0;
+		}
+		else
+			$id_member = 0;
+	}
+	elseif (empty($id_member) && isset($_SESSION['login_' . $cookiename]) && ($_SESSION['USER_AGENT'] == $_SERVER['HTTP_USER_AGENT'] || !empty($modSettings['disableCheckUA'])))
+	{
+		// !!! Perhaps we can do some more checking on this, such as on the first octet of the IP?
+		list ($id_member, $password, $login_span, $cookie_state, $cookie_id) = safe_unserialize($_SESSION['login_' . $cookiename]);
+		$id_member = !empty($id_member) && strlen($password) == 40 && $login_span > time() ? (int) $id_member : 0;
+	}]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[			// SHA-1 passwords should be 40 characters long.
+			elseif (strlen($password) == 40)
+				$check = sha1($user_settings['passwd'] . $user_settings['password_salt']) == $password;
+			else
+				$check = false;]]></search>
+			<add><![CDATA[			else{
+				if($cookie_id!=-1 && $login_span > time())
+				{
+					$array = safe_unserialize($user_settings['cookie_hash']);
+					$check = $array && isset($array[$cookie_id]) && $array[$cookie_id]['t'] > time() && password_verify($password,$array[$cookie_id]['p']);
+				}
+			}]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/LogInOut.php">
+		<operation>
+			<search position="replace"><![CDATA[		$user_settings['password_salt'] = substr(md5(mt_rand()), 0, 4);
+		updateMemberData($user_info['id'], array('password_salt' => $user_settings['password_salt']));
+
+		setLoginCookie($timeout - time(), $user_info['id'], sha1($user_settings['passwd'] . $user_settings['password_salt']));]]></search>
+			<add><![CDATA[
+		setLoginCookie($timeout - time(), $user_info['id'], -1);]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[	// Figure out the password using SMF's encryption - if what they typed is right.
+	if (isset($_POST['hash_passwrd']) && strlen($_POST['hash_passwrd']) == 40)
+	{
+		// Needs upgrading?
+		if (strlen($user_settings['passwd']) != 40)
+		{
+			$context['login_errors'] = array($txt['login_hash_error']);
+			$context['disable_login_hashing'] = true;
+			unset($user_settings);
+			return;
+		}
+		// Challenge passed.
+		elseif ($_POST['hash_passwrd'] == sha1($user_settings['passwd'] . $sc))
+			$sha_passwd = $user_settings['passwd'];
+		else
+		{
+			// Don't allow this!
+			validatePasswordFlood($user_settings['id_member'], $user_settings['passwd_flood']);
+
+			$_SESSION['failed_login'] = @$_SESSION['failed_login'] + 1;
+
+			if ($_SESSION['failed_login'] >= $modSettings['failed_login_threshold'])
+				redirectexit('action=reminder');
+			else
+			{
+				log_error($txt['incorrect_password'] . ' - <span class="remove">' . $user_settings['member_name'] . '</span>', 'user');
+
+				$context['disable_login_hashing'] = true;
+				$context['login_errors'] = array($txt['incorrect_password']);
+				unset($user_settings);
+				return;
+			}
+		}
+	}
+	else
+		$sha_passwd = sha1(strtolower($user_settings['member_name']) . un_htmlspecialchars($_POST['passwrd']));
+
+	// Bad password!  Thought you could fool the database?!
+	if ($user_settings['passwd'] != $sha_passwd)
+	{]]></search>
+			<add><![CDATA[
+	if (!password_verify(un_htmlspecialchars($_POST['passwrd']),$user_settings['passwd'])){]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[			$user_settings['passwd'] = $sha_passwd;
+			$user_settings['password_salt'] = substr(md5(mt_rand()), 0, 4);
+
+			// Update the password and set up the hash.
+			updateMemberData($user_settings['id_member'], array('passwd' => $user_settings['passwd'], 'password_salt' => $user_settings['password_salt'], 'passwd_flood' => ''));]]></search>
+			<add><![CDATA[			// Update the password and set up the hash
+			updateMemberData($user_settings['id_member'], array('passwd' => password_hash(un_htmlspecialchars($_POST['passwrd']),PASSWORD_BCRYPT), 'password_salt' => '', 'passwd_flood' => ''));]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[	setLoginCookie(60 * $modSettings['cookieTime'], $user_settings['id_member'], sha1($user_settings['passwd'] . $user_settings['password_salt']));]]></search>
+			<add><![CDATA[
+	setLoginCookie(60 * $modSettings['cookieTime'], $user_settings['id_member'], -1);]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[	// Empty the cookie! (set it in the past, and for id_member = 0)
+	setLoginCookie(-3600, 0);]]></search>
+			<add><![CDATA[
+	global $cookiename;
+	$array = safe_unserialize($_COOKIE[$cookiename]);
+	if(isset($array[4]) && !empty($user_info['id']))
+	{
+		$carray = safe_unserialize($user_settings['cookie_hash']);
+		if(isset($carray[$array[4]]))
+		{
+			unset($carray[$array[4]]);
+			updateMemberData($user_info['id'],array('cookie_hash' => serialize($carray)));
+		}
+	}]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[	// Load the data up!
+	$request = $smcFunc['db_query']('', '
+		SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt,
+			openid_uri, passwd_flood]]></search>
+			<add><![CDATA[	// Load the data up!
+	$request = $smcFunc['db_query']('', '
+		SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt,
+			openid_uri, passwd_flood, cookie_hash]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[	// Probably mistyped or their email, try it as an email address. (member_name first, though!)
+	if ($smcFunc['db_num_rows']($request) == 0)
+	{
+		$smcFunc['db_free_result']($request);
+
+		$request = $smcFunc['db_query']('', '
+			SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt, openid_uri,
+			passwd_flood]]></search>
+			<add><![CDATA[	// Probably mistyped or their email, try it as an email address. (member_name first, though!)
+	if ($smcFunc['db_num_rows']($request) == 0)
+	{
+		$smcFunc['db_free_result']($request);
+
+		$request = $smcFunc['db_query']('', '
+			SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt, openid_uri,
+			passwd_flood, cookie_hash]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Register.php">
+		<operation>
+			<search position="replace"><![CDATA[sha1(strtolower($row['member_name']) . $_REQUEST['passwd']) == $row['passwd']]]></search>
+			<add><![CDATA[password_verify($_REQUEST['passwd'],$row['passwd'])]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[$_POST['secret_answer'] = md5($_POST['secret_answer']);]]></search>
+			<add><![CDATA[$_POST['secret_answer'] = password_hash($_POST['secret_answer'],PASSWORD_BCRYPT);]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[setLoginCookie(60 * $modSettings['cookieTime'], $memberID, sha1(sha1(strtolower($regOptions['username']) . $regOptions['password']) . $regOptions['register_vars']['password_salt']));]]></search>
+			<add><![CDATA[global $user_settings;
+		$user_settings['id_member'] = $memberID;
+		$user_settings['cookie_hash'] = '';
+		setLoginCookie(60 * $modSettings['cookieTime'], $memberID, -1);]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Reminder.php">
+		<operation>
+			<search postion="replace"><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => sha1(strtolower($username) . $_POST['passwrd1'])));]]></search>
+			<add><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => password_hash($_POST['passwrd1'],PASSWORD_BCRYPT)));]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[updateMemberData($row['id_member'], array('passwd' => sha1(strtolower($row['member_name']) . $_POST['passwrd1'])));]]></search>
+			<add><![CDATA[updateMemberData($row['id_member'], array('passwd' => password_hash($_POST['passwrd1'],PASSWORD_BCRYPT)));]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])]]></search>
+			<add><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || !password_verify($_POST['secret_answer'],$row['secret_answer']))]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Security.php">
+		<operation>
+			<search position="replace"><![CDATA[	// Hashed password, ahoy!
+	if (isset($_POST['admin_hash_pass']) && strlen($_POST['admin_hash_pass']) == 40)
+	{
+		checkSession();
+
+		$good_password = in_array(true, call_integration_hook('integrate_verify_password', array($user_info['username'], $_POST['admin_hash_pass'], true)), true);
+
+		if ($good_password || $_POST['admin_hash_pass'] == sha1($user_info['passwd'] . $sc))
+		{
+			$_SESSION['admin_time'] = time();
+			unset($_SESSION['request_referer']);
+			return;
+		}
+	}]]></search>
+			<add><![CDATA[/* THIS IS FUCKING INSECURE */]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[sha1(strtolower($user_info['username']) . $_POST['admin_pass']) == $user_info['passwd']]]></search>
+			<add><![CDATA[password_verify($_POST['admin_pass'],$user_info['passwd'])]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Profile.php">
+		<operation>
+			<search position="replace"><![CDATA[if (!$good_password && $user_info['passwd'] != sha1(strtolower($cur_profile['member_name']) . $_POST['oldpasswrd']))]]></search>
+			<add><![CDATA[if (!$good_password && !password_verify($_POST['oldpasswrd'],$user_info['passwd']))]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Profile-Modify.php">
+		<operation>
+			<search position="replace"><![CDATA[$value = sha1(strtolower($cur_profile[\'member_name\']) . un_htmlspecialchars($value));]]></search>
+			<add><![CDATA[$value = password_hash(un_htmlspecialchars($value),PASSWORD_BCRYPT);]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[$passwd = sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd1']));]]></search>
+			<add><![CDATA[$passwd = password_hash(un_htmlspecialchars($_POST['passwrd1']),PASSWORD_BCRYPT);]]></add>
+		</operation>
+		<operation>
+			<search position="replaced"><![CDATA[
+				if ($context['user']['is_owner'])
+					setLoginCookie(60 * $modSettings['cookieTime'], $memID, sha1(sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd2'])) . $cur_profile['password_salt']));]]></search>
+			<add><![CDATA[/* NO NEED TO UPDATE COOKIE AS IT USES A SEPERATE DB KEY */]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[setLoginCookie(60 * $modSettings['cookieTime'], $context['id_member'], sha1(sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd2'])) . $cur_profile['password_salt']));]]></search>
+			<add><![CDATA[/* AGAIN, THIS IS UNNEEDED */]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[$value = $value != \'\' ? md5($value) : \'\';]]></search>
+			<add><![CDATA[$value = $value != \'\' ? password_hash($value,PASSWORD_BCRYPT) : \'\';]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/ManageServer.php">
+		<operation>
+			<search position="replace"><![CDATA[			setLoginCookie(60 * $modSettings['cookieTime'], $user_settings['id_member'], sha1($user_settings['passwd'] . $user_settings['password_salt']));]]></search>
+			<add><![CDATA[			setLoginCookie(60 * $modSettings['cookieTime'], $user_settings['id_member'], -1);]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Subs-Members.php">
+		<operation>
+			<search position="replace"><![CDATA['passwd' => sha1(strtolower($regOptions['username']) . $regOptions['password']),
+		'password_salt' => substr(md5(mt_rand()), 0, 4) ,]]></search>
+			<add><![CDATA['passwd' => password_hash($regOptions['password'],PASSWORD_BCRYPT),
+		'password_salt' => '' ,]]></add>
+		</operation>
+	</file>
+	<file name="$themedir/index.template.php">
+		<operation>
+			<search position="replace"><![CDATA[<form id="guest_form" action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\');"' : '', '>]]></search>
+			<add><![CDATA[<form id="guest_form" action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '">]]></add>
+		</operation>
+	</file>
+	<file name="$themedir/Login.template.php">
+		<operation>
+			<search position="replace"><![CDATA[function template_login()
+{
+	global $context, $settings, $options, $scripturl, $modSettings, $txt;
+
+	echo '
+		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+
+		<form action="', $scripturl, '?action=login2" name="frmLogin" id="frmLogin" method="post" accept-charset="', $context['character_set'], '" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\');"' : '', '>]]></search>
+			<add><![CDATA[function template_login()
+{
+	global $context, $settings, $options, $scripturl, $modSettings, $txt;
+
+	echo '
+		<form action="', $scripturl, '?action=login2" name="frmLogin" id="frmLogin" method="post" accept-charset="', $context['character_set'], '">]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[function template_kick_guest()
+{
+	global $context, $settings, $options, $scripturl, $modSettings, $txt;
+
+	// This isn't that much... just like normal login but with a message at the top.
+	echo '
+	<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+	<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin"', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\');"' : '', '>]]></search>
+			<add><![CDATA[function template_kick_guest()
+{
+	global $context, $settings, $options, $scripturl, $modSettings, $txt;
+
+	// This isn't that much... just like normal login but with a message at the top.
+	echo '<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin">]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[function template_maintenance()
+{
+	global $context, $settings, $options, $scripturl, $txt, $modSettings;
+
+	// Display the administrator's message at the top.
+	echo '
+<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '"', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\');"' : '', '>]]></search>
+			<add><![CDATA[function template_maintenance()
+{
+	global $context, $settings, $options, $scripturl, $txt, $modSettings;
+
+	// Display the administrator's message at the top.
+	echo '<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '">]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[function template_admin_login()
+{
+	global $context, $settings, $options, $scripturl, $txt;
+
+	// Since this should redirect to whatever they were doing, send all the get data.
+	echo '
+<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+
+<form action="', $scripturl, $context['get_data'], '" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin" onsubmit="hashAdminPassword(this, \'', $context['user']['username'], '\', \'', $context['session_id'], '\');">]]></search>
+			<add><![CDATA[function template_admin_login()
+{
+	global $context, $settings, $options, $scripturl, $txt;
+
+	// Since this should redirect to whatever they were doing, send all the get data.
+	echo '<form action="', $scripturl, $context['get_data'], '" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin">]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Subs-Auth.php">
+		<operation>
+			<search position="replace"><![CDATA[$newPassword_sha1 = sha1(strtolower($user) . $newPassword);]]></search>
+			<add><![CDATA[$newPassword_sha1 = password_hash($newPassword,PASSWORD_BCRYPT);]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[// Actually set the login cookie...
+function setLoginCookie($cookie_length, $id, $password = '')
+{
+	global $cookiename, $boardurl, $modSettings;
+
+	// If changing state force them to re-address some permission caching.
+	$_SESSION['mc']['time'] = 0;
+
+	// The cookie may already exist, and have been set with different options.
+	$cookie_state = (empty($modSettings['localCookies']) ? 0 : 1) | (empty($modSettings['globalCookies']) ? 0 : 2);
+	if (isset($_COOKIE[$cookiename]) && preg_match('~^a:[34]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:(0|40):"([a-fA-F0-9]{40})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~', $_COOKIE[$cookiename]) === 1)
+	{
+		$array = safe_unserialize($_COOKIE[$cookiename]);
+
+		// Out with the old, in with the new!
+		if (isset($array[3]) && $array[3] != $cookie_state)
+		{
+			$cookie_url = url_parts($array[3] & 1 > 0, $array[3] & 2 > 0);
+			setcookie($cookiename, serialize(array(0, '', 0)), time() - 3600, $cookie_url[1], $cookie_url[0], !empty($modSettings['secureCookies']));
+		}
+	}
+
+	// Get the data and path to set it on.
+	$data = serialize(empty($id) ? array(0, '', 0) : array($id, $password, time() + $cookie_length, $cookie_state));
+	$cookie_url = url_parts(!empty($modSettings['localCookies']), !empty($modSettings['globalCookies']));]]></search>
+			<add><![CDATA[// Actually set the login cookie...
+function setLoginCookie($cookie_length, $id, $cid = false)
+{
+	global $cookiename, $boardurl, $modSettings, $user_settings;
+	
+	// If changing state force them to re-address some permission caching.
+	$_SESSION['mc']['time'] = 0;
+
+	// The cookie may already exist, and have been set with different options.
+	$cookie_state = (empty($modSettings['localCookies']) ? 0 : 1) | (empty($modSettings['globalCookies']) ? 0 : 2);
+	if (isset($_COOKIE[$cookiename]) && preg_match('~^a:[345]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:(0|32):"([a-fA-F0-9]{32})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?(i:4;i:\d+;)?\}$~i', $_COOKIE[$cookiename]) === 1)
+	{
+		$array = safe_unserialize($_COOKIE[$cookiename]);
+
+		// Out with the old, in with the new!
+		if (isset($array[3]) && $array[3] != $cookie_state)
+		{
+			$cookie_url = url_parts($array[3] & 1 > 0, $array[3] & 2 > 0);
+			setcookie($cookiename, serialize(array(0, '', 0)), time() - 3600, $cookie_url[1], $cookie_url[0], !empty($modSettings['secureCookies']));
+		}
+	}
+	$password = '';
+	if($cid !== false && !empty($id) && $id == $user_settings['id_member'])
+	{
+		if($carray = safe_unserialize($user_settings['cookie_hash']))
+		{
+			if(isset($array[$cid]))
+			{
+				unset($array[$cid]);
+			}
+		}
+		else
+		{
+			$carray = array();
+		}
+		if($cid == -1)
+		{
+			if(!empty($array) && isset($carray[$array[4]])) // we don't need any old stuff clogging the DB
+			{
+				unset($carray[$array[4]]);
+			}
+			
+			for($cid = 0;isset($carray[$cid]);$cid++);
+		}
+		$password = bin2hex(openssl_random_pseudo_bytes(16));
+		$carray[$cid] = array(
+			't' => $cookie_length + time(),
+			'p' => password_hash($password,PASSWORD_BCRYPT)
+		);
+		updateMemberData($id,array('cookie_hash' => serialize($carray)));
+	}
+
+	// Get the data and path to set it on.
+	$data = serialize($password=='' ? array(0, '', 0, -1, 0) : array($id, $password, $cookie_length + time(), $cookie_state, $cid));
+	$cookie_url = url_parts(!empty($modSettings['localCookies']), !empty($modSettings['globalCookies']));]]></add>
+		</operation>
+	</file>
+</modification>
