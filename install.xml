@@ -115,7 +115,7 @@
 			// Update the password and set up the hash.
 			updateMemberData($user_settings['id_member'], array('passwd' => $user_settings['passwd'], 'password_salt' => $user_settings['password_salt'], 'passwd_flood' => ''));]]></search>
 			<add><![CDATA[			// Update the password and set up the hash
-			updateMemberData($user_settings['id_member'], array('passwd' => password_hash(un_htmlspecialchars($_POST['passwrd']),PASSWORD_BCRYPT), 'password_salt' => '', 'passwd_flood' => ''));]]></add>
+			updateMemberData($user_settings['id_member'], array('passwd' => password_hash(un_htmlspecialchars($_POST['passwrd']),PASSWORD_DEFAULT), 'password_salt' => '', 'passwd_flood' => ''));]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[	setLoginCookie(60 * $modSettings['cookieTime'], $user_settings['id_member'], sha1($user_settings['passwd'] . $user_settings['password_salt']));]]></search>
@@ -174,7 +174,7 @@
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[$_POST['secret_answer'] = md5($_POST['secret_answer']);]]></search>
-			<add><![CDATA[$_POST['secret_answer'] = password_hash($_POST['secret_answer'],PASSWORD_BCRYPT);]]></add>
+			<add><![CDATA[$_POST['secret_answer'] = password_hash($_POST['secret_answer'],PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[setLoginCookie(60 * $modSettings['cookieTime'], $memberID, sha1(sha1(strtolower($regOptions['username']) . $regOptions['password']) . $regOptions['register_vars']['password_salt']));]]></search>
@@ -187,11 +187,11 @@
 	<file name="$sourcedir/Reminder.php">
 		<operation>
 			<search postion="replace"><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => sha1(strtolower($username) . $_POST['passwrd1'])));]]></search>
-			<add><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => password_hash($_POST['passwrd1'],PASSWORD_BCRYPT)));]]></add>
+			<add><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => password_hash($_POST['passwrd1'],PASSWORD_DEFAULT)));]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[updateMemberData($row['id_member'], array('passwd' => sha1(strtolower($row['member_name']) . $_POST['passwrd1'])));]]></search>
-			<add><![CDATA[updateMemberData($row['id_member'], array('passwd' => password_hash($_POST['passwrd1'],PASSWORD_BCRYPT)));]]></add>
+			<add><![CDATA[updateMemberData($row['id_member'], array('passwd' => password_hash($_POST['passwrd1'],PASSWORD_DEFAULT)));]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])]]></search>
@@ -230,11 +230,11 @@
 	<file name="$sourcedir/Profile-Modify.php">
 		<operation>
 			<search position="replace"><![CDATA[$value = sha1(strtolower($cur_profile[\'member_name\']) . un_htmlspecialchars($value));]]></search>
-			<add><![CDATA[$value = password_hash(un_htmlspecialchars($value),PASSWORD_BCRYPT);]]></add>
+			<add><![CDATA[$value = password_hash(un_htmlspecialchars($value),PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[$passwd = sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd1']));]]></search>
-			<add><![CDATA[$passwd = password_hash(un_htmlspecialchars($_POST['passwrd1']),PASSWORD_BCRYPT);]]></add>
+			<add><![CDATA[$passwd = password_hash(un_htmlspecialchars($_POST['passwrd1']),PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replaced"><![CDATA[
@@ -248,7 +248,7 @@
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[$value = $value != \'\' ? md5($value) : \'\';]]></search>
-			<add><![CDATA[$value = $value != \'\' ? password_hash($value,PASSWORD_BCRYPT) : \'\';]]></add>
+			<add><![CDATA[$value = $value != \'\' ? password_hash($value,PASSWORD_DEFAULT) : \'\';]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/ManageServer.php">
@@ -261,7 +261,7 @@
 		<operation>
 			<search position="replace"><![CDATA['passwd' => sha1(strtolower($regOptions['username']) . $regOptions['password']),
 		'password_salt' => substr(md5(mt_rand()), 0, 4) ,]]></search>
-			<add><![CDATA['passwd' => password_hash($regOptions['password'],PASSWORD_BCRYPT),
+			<add><![CDATA['passwd' => password_hash($regOptions['password'],PASSWORD_DEFAULT),
 		'password_salt' => '' ,]]></add>
 		</operation>
 	</file>
@@ -341,7 +341,7 @@
 	<file name="$sourcedir/Subs-Auth.php">
 		<operation>
 			<search position="replace"><![CDATA[$newPassword_sha1 = sha1(strtolower($user) . $newPassword);]]></search>
-			<add><![CDATA[$newPassword_sha1 = password_hash($newPassword,PASSWORD_BCRYPT);]]></add>
+			<add><![CDATA[$newPassword_sha1 = password_hash($newPassword,PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[// Actually set the login cookie...
@@ -416,7 +416,7 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 		$password = bin2hex(openssl_random_pseudo_bytes(16));
 		$carray[$cid] = array(
 			't' => $cookie_length + time(),
-			'p' => password_hash($password,PASSWORD_BCRYPT)
+			'p' => password_hash($password,PASSWORD_DEFAULT)
 		);
 		updateMemberData($id,array('cookie_hash' => serialize($carray)));
 	}
