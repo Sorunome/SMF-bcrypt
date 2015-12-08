@@ -3,12 +3,20 @@
 <modification xmlns="http://www.simplemachines.org/xml/modification" xmlns:smf="http://www.simplemachines.org/">
 	<id>Sorunome:bcrypt</id>
 	<version>0.1</version>
+	<file name="$boarddir/index.php">
+		<operation>
+			<search position="before"><![CDATA[
+		'restoretopic' => array('RemoveTopic.php', 'RestoreTopic'),]]></search>
+			<add><![CDATA[
+		'rsakeys' => array('LogInOut.php', 'getRSAKeys'),]]></add>
+		</operation>
+	</file>
 	<file name="$sourcedir/Load.php">
 		<operation>
 			<search position="replace"><![CDATA[	if (empty($id_member) && isset($_COOKIE[$cookiename]))
 	{
 		// Fix a security hole in PHP 4.3.9 and below...
-		if (preg_match('~^a:[34]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:(0|40):"([a-fA-F0-9]{40})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~i', $_COOKIE[$cookiename]) == 1)
+		if (preg_match('~^a:[34]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:\d+:"[a-fA-F0-9]*";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~i', $_COOKIE[$cookiename]) == 1)
 		{
 			list ($id_member, $password) = safe_unserialize($_COOKIE[$cookiename]);
 			$id_member = !empty($id_member) && strlen($password) > 0 ? (int) $id_member : 0;
@@ -25,7 +33,7 @@
 			<add><![CDATA[	if (empty($id_member) && isset($_COOKIE[$cookiename]))
 	{
 		// Fix a security hole in PHP 4.3.9 and below...
-		if (preg_match('~^a:[345]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:(0|32):"([a-fA-F0-9]{32})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?(i:4;i:\d+;)?\}$~i', $_COOKIE[$cookiename]) == 1)
+		if (preg_match('~^a:[345]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:\d+:"[a-fA-F0-9]*";i:2;[id]:\d{1,14};(i:3;i:\d;)?(i:4;i:\d+;)?\}$~i', $_COOKIE[$cookiename]) == 1)
 		{
 			list ($id_member, $password, $login_span, $cookie_state, $cookie_id) = safe_unserialize($_COOKIE[$cookiename]);
 			$id_member = !empty($id_member) && strlen($password) > 0 ? (int) $id_member : 0;
@@ -63,6 +71,10 @@
 		setLoginCookie($timeout - time(), $user_info['id'], sha1($user_settings['passwd'] . $user_settings['password_salt']));]]></search>
 			<add><![CDATA[
 		setLoginCookie($timeout - time(), $user_info['id'], -1);]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[if ((!isset($_POST['passwrd']) || $_POST['passwrd'] == '') && (!isset($_POST['hash_passwrd']) || strlen($_POST['hash_passwrd']) != 40))]]></search>
+			<add><![CDATA[if ((!isset($_POST['passwrd']) || $_POST['passwrd'] == '') && (!isset($_POST['hash_passwrd'])))]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[	// Figure out the password using SMF's encryption - if what they typed is right.
@@ -106,6 +118,10 @@
 	if ($user_settings['passwd'] != $sha_passwd)
 	{]]></search>
 			<add><![CDATA[
+	if(!empty($_POST['hash_passwrd'])){
+		$_POST['passwrd'] = getRSAValue(array($_POST['hash_passwrd']))[0];
+	}
+	
 	if (!password_verify(un_htmlspecialchars($_POST['passwrd']),$user_settings['passwd'])){]]></add>
 		</operation>
 		<operation>
@@ -165,6 +181,82 @@
 		$request = $smcFunc['db_query']('', '
 			SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt, openid_uri,
 			passwd_flood, cookie_hash]]></add>
+		</operation>
+		<operation>
+			<search position="end" />
+			<add><![CDATA[
+function getRSAKeys(){
+	global $smcFunc;
+	header('Content-Type:application/json');
+	$ret = array();
+	for($i = 0;$i < (int)$_GET['num'];$i++){
+		
+		$res = openssl_pkey_new();
+		openssl_pkey_export($res,$privKey);
+		$pubKey = openssl_pkey_get_details($res);
+		$pubKey = $pubKey['key'];
+		
+		$smcFunc['db_insert']('insert',
+			'{db_prefix}rsa_keys',
+			array(
+				'privKey' => 'string', 'pubKey' => 'string'
+			),
+			array($privKey,$pubKey),
+			array('privKey','pubKey')
+		);
+		$ret[] = array(
+			'i' => $smcFunc['db_insert_id']('{db_prefix}rsa_keys','key_id'),
+			'key' => $pubKey
+		);
+	}
+	
+	echo json_encode($ret);
+	exit;
+}
+
+function getRSAValue($crypt_unparsed){
+	global $smcFunc;
+	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE ts < (NOW() - INTERVAL 1 MINUTE)');
+	$crypt = array();
+	$fetchKeys = array();
+	foreach($crypt_unparsed as $c){
+		$c = explode('|',$c,2);
+		if(sizeof($c) != 2 || in_array((int)$c[0],$fetchKeys)){
+			$crypt[] = array(
+				'i' => -1,
+				'val' => ''
+			);
+		}else{
+			$crypt[] = array(
+				'i' => (int)$c[0],
+				'val' => $c[1]
+			);
+			$fetchKeys[] = (int)$c[0];
+		}
+	}
+	$dbKeys = array();
+	$request = $smcFunc['db_query']('','SELECT key_id,privKey FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
+	while($res = $smcFunc['db_fetch_assoc']($request)){
+		$dbKeys[(int)$res['key_id']] = $res['privKey'];
+	}
+	$smcFunc['db_free_result']($request);
+	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
+	
+	$cryptRet = array();
+	foreach($crypt as $c){
+		if($c['i'] == -1 || !isset($dbKeys[$c['i']])){
+			$cryptRet[] = '';
+		}else{
+			if(openssl_private_decrypt(base64_decode($c['val']),$plain,openssl_get_privatekey($dbKeys[$c['i']]))){
+				$cryptRet[] = $plain;
+			}else{
+				$cryptRet[] = '';
+			}
+		}
+	}
+	return $cryptRet;
+}
+]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Register.php">
@@ -267,8 +359,12 @@
 	</file>
 	<file name="$themedir/index.template.php">
 		<operation>
-			<search position="replace"><![CDATA[<form id="guest_form" action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\');"' : '', '>]]></search>
-			<add><![CDATA[<form id="guest_form" action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '">]]></add>
+			<search position="replace"><![CDATA[<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>]]></search>
+			<add><![CDATA[<!--sha1 not needed anymore-->]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[id="guest_form" action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\');"' : '', '>]]></search>
+			<add><![CDATA[id="guest_form" action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" ', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'passwrd\',b:\'hash_passwrd\'}]);"' : '', '>]]></add>
 		</operation>
 	</file>
 	<file name="$themedir/Login.template.php">
@@ -286,7 +382,7 @@
 	global $context, $settings, $options, $scripturl, $modSettings, $txt;
 
 	echo '
-		<form action="', $scripturl, '?action=login2" name="frmLogin" id="frmLogin" method="post" accept-charset="', $context['character_set'], '">]]></add>
+		<form action="', $scripturl, '?action=login2" name="frmLogin" id="frmLogin" method="post" accept-charset="', $context['character_set'], '" ', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'passwrd\',b:\'hash_passwrd\'}]);"' : '', '>]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[function template_kick_guest()
@@ -302,7 +398,7 @@
 	global $context, $settings, $options, $scripturl, $modSettings, $txt;
 
 	// This isn't that much... just like normal login but with a message at the top.
-	echo '<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin">]]></add>
+	echo '<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin"', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'passwrd\',b:\'hash_passwrd\'}]);"' : '', '>]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[function template_maintenance()
@@ -318,7 +414,7 @@
 	global $context, $settings, $options, $scripturl, $txt, $modSettings;
 
 	// Display the administrator's message at the top.
-	echo '<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '">]]></add>
+	echo '<form action="', $scripturl, '?action=login2" method="post" accept-charset="', $context['character_set'], '"', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'passwrd\',b:\'hash_passwrd\'}]);"' : '', '>]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[function template_admin_login()
@@ -335,7 +431,7 @@
 	global $context, $settings, $options, $scripturl, $txt;
 
 	// Since this should redirect to whatever they were doing, send all the get data.
-	echo '<form action="', $scripturl, $context['get_data'], '" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin">]]></add>
+	echo '<form action="', $scripturl, $context['get_data'], '" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin" onsubmit="return rsaFormPasswords(this, [{a:\'admin_pass\',b:\'admin_hash_pass\'}]);">]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Subs-Auth.php">
@@ -424,6 +520,44 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 	// Get the data and path to set it on.
 	$data = serialize($password=='' ? array(0, '', 0, -1, 0) : array($id, $password, $cookie_length + time(), $cookie_state, $cid));
 	$cookie_url = url_parts(!empty($modSettings['localCookies']), !empty($modSettings['globalCookies']));]]></add>
+		</operation>
+	</file>
+	<file name="$themedir/scripts/script.js">
+		<operation>
+			<search position="end" />
+			<add><![CDATA[
+function rsaFormPasswords(form,pwds){
+	ajax_indicator(true);
+	var callback = function(){
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function(){
+			if (xhttp.readyState == 4 && xhttp.status == 200) {
+				var keys = JSON.parse(xhttp.response),
+					encrypt;
+				for(var i = 0;i < pwds.length;i++){
+					encrypt = new JSEncrypt();
+					encrypt.setPublicKey(keys[i].key);
+					form[pwds[i].b].value = keys[i].i.toString()+'|'+encrypt.encrypt(form[pwds[i].a].value);
+					form[pwds[i].a].value = '';
+				}
+				form.submit();
+			}
+		}
+		xhttp.open('GET',smf_scripturl+'?action=rsakeys;num='+pwds.length,true);
+		xhttp.send();
+	};
+	if(typeof JSEncrypt == 'undefined'){
+		var s = document.createElement('script');
+		s.type = 'text/javascript';
+		s.src = smf_theme_url+'/scripts/jsencrypt.min.js';
+		s.onload = callback;
+		document.getElementsByTagName('head')[0].appendChild(s);
+	}else{
+		callback();
+	}
+	return false;
+}
+]]></add>
 		</operation>
 	</file>
 </modification>
