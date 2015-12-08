@@ -220,6 +220,15 @@
 		$user_settings['cookie_hash'] = '';
 		setLoginCookie(60 * $modSettings['cookieTime'], $memberID, -1);]]></add>
 		</operation>
+		<operation>
+			<search position="before"><![CDATA[$possible_strings = array_diff($possible_strings, $exclude_fields);
+	$possible_ints = array_diff($possible_ints, $exclude_fields);
+	$possible_floats = array_diff($possible_floats, $exclude_fields);
+	$possible_bools = array_diff($possible_bools, $exclude_fields);]]></search>
+			<add><![CDATA[
+	require_once($sourcedir.'/Subs-Auth.php');
+	getRSAFromPost(array('passwrd1','passwrd2'));]]></add>
+		</operation>
 	</file>
 	<file name="$sourcedir/Reminder.php">
 		<operation>
@@ -231,15 +240,28 @@
 			<add><![CDATA[updateMemberData($row['id_member'], array('passwd' => password_hash($smcFunc['strtolower']($row['member_name']).$_POST['passwrd1'],PASSWORD_DEFAULT)));]]></add>
 		</operation>
 		<operation>
-			<search position="replace"><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])]]></search>
-			<add><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || !password_verify($_POST['secret_answer'],$row['secret_answer']))]]></add>
+			<search position="replace"><![CDATA[	// Check if the secret answer is correct.
+	if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])]]></search>
+			<add><![CDATA[
+	require_once($sourcedir.'/Subs-Auth.php');
+	getRSAFromPost(array('passwrd1','passwrd2','secret_answer'));
+	// Check if the secret answer is correct.
+	if ($row['secret_question'] == '' || $row['secret_answer'] == '' || !password_verify($_POST['secret_answer'],$row['secret_answer']))]]></add>
 		</operation>
 		<operation>
-			<search position="before"><![CDATA[$possible_strings = array_diff($possible_strings, $exclude_fields);
-	$possible_ints = array_diff($possible_ints, $exclude_fields);
-	$possible_floats = array_diff($possible_floats, $exclude_fields);
-	$possible_bools = array_diff($possible_bools, $exclude_fields);]]></search>
-			<add><![CDATA[]]></add>
+			<search position="before"><![CDATA[function setPassword2()
+{
+	global $context, $txt, $modSettings, $smcFunc, $sourcedir;
+
+	checkSession();
+
+	if (empty($_POST['u']) || !isset($_POST['passwrd1']) || !isset($_POST['passwrd2']))
+		fatal_lang_error('no_access', false);
+
+	$_POST['u'] = (int) $_POST['u'];
+]]></search>
+			<add><![CDATA[	require_once($sourcedir.'/Subs-Auth.php');
+	getRSAFromPost(array('passwrd1','passwrd2','secret_answer'));]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Security.php">
@@ -258,17 +280,27 @@
 			return;
 		}
 	}]]></search>
-			<add><![CDATA[/* THIS IS FUCKING INSECURE */]]></add>
+			<add><![CDATA[	if(isset($_POST['admin_hash_pass'])){
+		$_POST['admin_pass'] = getRSAValue(array($_POST['admin_hash_pass']))[0];
+	}]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[sha1(strtolower($user_info['username']) . $_POST['admin_pass']) == $user_info['passwd']]]></search>
-			<add><![CDATA[password_verify($smcFunc['strtolower']($user_info['username']).$_POST['admin_pass'],$user_info['passwd'])]]></add>
+			<add><![CDATA[password_verify(strtolower($user_info['username']).$_POST['admin_pass'],$user_info['passwd'])]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Profile.php">
 		<operation>
 			<search position="replace"><![CDATA[if (!$good_password && $user_info['passwd'] != sha1(strtolower($cur_profile['member_name']) . $_POST['oldpasswrd']))]]></search>
 			<add><![CDATA[if (!$good_password && !password_verify($smcFunc['strtolower']($cur_profile['member_name']).$_POST['oldpasswrd'],$user_info['passwd']))]]></add>
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[function ModifyProfile($post_errors = array())
+{
+	global $txt, $scripturl, $user_info, $context, $sourcedir, $user_profile, $cur_profile;
+	global $modSettings, $memberContext, $profile_vars, $smcFunc, $post_errors, $options, $user_settings;]]></search>
+			<add><![CDATA[	require_once($sourcedir.'/Subs-Auth.php');
+	getRSAFromPost(array('passwrd1','passwrd2','secret_answer','oldpasswrd'));]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Profile-Modify.php">
@@ -278,7 +310,7 @@
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[$passwd = sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd1']));]]></search>
-			<add><![CDATA[$passwd = password_hash($smcFunc['strtolower']($cur_profile['member_name']).un_htmlspecialchars($_POST['passwrd1']),PASSWORD_DEFAULT);]]></add>
+			<add><![CDATA[$passwd = password_hash(strtolower($cur_profile['member_name']).un_htmlspecialchars($_POST['passwrd1']),PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replaced"><![CDATA[
@@ -389,8 +421,37 @@
 	<file name="$themedir/Register.template.php">
 		<operation>
 			<search position="replace"><![CDATA[<form action="', $scripturl, '?action=register2" method="post" accept-charset="', $context['character_set'], '" name="registration" id="registration" onsubmit="return verifyAgree();">]]></search>
-			<add><![CDATA[<form action="', $scripturl, '?action=register2" method="post" accept-charset="', $context['character_set'], '" name="registration" id="registration" onsubmit="',empty($context['disable_login_hashing'])?'return verifyAgree() && rsaFormPasswords(this,[{a:\'passwrd1\',b:\'passwrd1_hash\'},{a:\'passwrd2\',b:\'passwrd2_hash\'}]);':'return verifyAgree();','">
+			<add><![CDATA[<form action="', $scripturl, '?action=register2" method="post" accept-charset="', $context['character_set'], '" name="registration" id="registration" onsubmit="',empty($context['disable_login_hashing'])?'return verifyAgree()!==false && rsaFormPasswords(this,[{a:\'passwrd1\',b:\'passwrd1_hash\'},{a:\'passwrd2\',b:\'passwrd2_hash\'}]);':'return verifyAgree();','">
 				<input type="hidden" name="passwrd1_hash" value="" /><input type="hidden" name="passwrd2_hash" value="" />]]></add>
+		</operation>
+	</file>
+	<file name="$themedir/Profile.template.php">
+		<operation>
+			<search position="replace"><![CDATA[<form action="', (!empty($context['profile_custom_submit_url']) ? $context['profile_custom_submit_url'] : $scripturl . '?action=profile;area=' . $context['menu_item_selected'] . ';u=' . $context['id_member'] . ';save'), '" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator" enctype="multipart/form-data" onsubmit="return checkProfileSubmit();">]]></search>
+			<add><![CDATA[<form action="', (!empty($context['profile_custom_submit_url']) ? $context['profile_custom_submit_url'] : $scripturl . '?action=profile;area=' . $context['menu_item_selected'] . ';u=' . $context['id_member'] . ';save'), '" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator" enctype="multipart/form-data" onsubmit="',empty($context['disable_login_hashing'])?'return checkProfileSubmit()!==false && rsaFormPasswords(this,[{a:\'passwrd1\',b:\'passwrd1_hash\'},{a:\'passwrd2\',b:\'passwrd2_hash\'},{a:\'secret_answer\',b:\'secret_answer_hash\'},{a:\'oldpasswrd\',b:\'oldpasswrd_hash\'}]);':'return checkProfileSubmit();','">
+				<input type="hidden" name="passwrd1_hash" value="" /><input type="hidden" name="passwrd2_hash" value="" /><input type="hidden" name="secret_answer_hash" value="" /><input type="hidden" name="oldpasswrd_hash" value="" />]]></add>
+		</operation>
+		<operaton>
+			<search position="replace"><![CDATA[<form action="', $scripturl, '?action=profile;area=deleteaccount;save" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator">]]></search>
+			<add><![CDATA[<form action="', $scripturl, '?action=profile;area=deleteaccount;save" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator"', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'oldpasswrd\',b:\'oldpasswrd_hash\'}]);"' : '', '>
+				<input type="hidden" name="oldpasswrd_hash" value="" />]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[<form action="', $scripturl, '?action=profile;area=authentication;save" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator" enctype="multipart/form-data">]]></search>
+			<add><![CDATA[<form action="', $scripturl, '?action=profile;area=authentication;save" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator" enctype="multipart/form-data"', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'passwrd1\',b:\'passwrd1_hash\'},{a:\'passwrd2\',b:\'passwrd2_hash\'},{a:\'oldpasswrd\',b:\'oldpasswrd_hash\'}]);"' : '', '>
+				<input type="hidden" name="passwrd1_hash" value="" /><input type="hidden" name="passwrd2_hash" value="" /><input type="hidden" name="oldpasswrd_hash" value="" />]]></add>
+		</operation>
+	</file>
+	<file name="$themedir/Reminder.template.php">
+		<operation>
+			<search position="replace"><![CDATA[<form action="', $scripturl, '?action=reminder;sa=setpassword2" name="reminder_form" id="reminder_form" method="post" accept-charset="', $context['character_set'], '">]]></search>
+			<add><![CDATA[<form action="', $scripturl, '?action=reminder;sa=setpassword2" name="reminder_form" id="reminder_form" method="post" accept-charset="', $context['character_set'], '"', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'passwrd1\',b:\'passwrd1_hash\'},{a:\'passwrd2\',b:\'passwrd2_hash\'}]);"' : '', '>
+		<input type="hidden" name="passwrd1_hash" value="" /><input type="hidden" name="passwrd2_hash" value="" />]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[<form action="', $scripturl, '?action=reminder;sa=secret2" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator">]]></search>
+			<add><![CDATA[<form action="', $scripturl, '?action=reminder;sa=secret2" method="post" accept-charset="', $context['character_set'], '" name="creator" id="creator"', empty($context['disable_login_hashing']) ? ' onsubmit="return rsaFormPasswords(this, [{a:\'secret_answer\',b:\'secret_answer_hash\'},{a:\'passwrd1\',b:\'passwrd1_hash\'},{a:\'passwrd2\',b:\'passwrd2_hash\'}]);"' : '', '>
+		<input type="hidden" name="secret_answer_hash" value="" /><input type="hidden" name="passwrd1_hash" value="" /><input type="hidden" name="passwrd2_hash" value="" />]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Subs-Auth.php">
@@ -555,6 +616,22 @@ function getRSAValue($crypt_unparsed){
 	}
 	return $cryptRet;
 }
+
+function getRSAFromPost($arr){
+	$decryptArr = array();
+	$decryptVals = array();
+	foreach($arr as $a){
+		if(!empty($_POST[$a.'_hash'])){
+			$decryptArr[] = $a;
+			$decryptVals[] = $_POST[$a.'_hash'];
+		}
+	}
+	if(sizeof($decryptVals) > 0){
+		foreach(getRSAValue($decryptVals) as $i => $v){
+			$_POST[$decryptArr[$i]] = $v;
+		}
+	}
+}
 ]]></add>
 		</operation>
 	</file>
@@ -563,6 +640,16 @@ function getRSAValue($crypt_unparsed){
 			<search position="end" />
 			<add><![CDATA[
 function rsaFormPasswords(form,pwds){
+	var def = false;
+	for(var i = 0;i < pwds.length;i++){
+		if(form[pwds[i].a] !== undefined){
+			def = true;
+			break;
+		}
+	}
+	if(!def){
+		return true;
+	}
 	ajax_indicator(true);
 	var callback = function(){
 		var xhttp = new XMLHttpRequest();
@@ -573,8 +660,10 @@ function rsaFormPasswords(form,pwds){
 				for(var i = 0;i < pwds.length;i++){
 					encrypt = new JSEncrypt();
 					encrypt.setPublicKey(keys[i].key);
-					form[pwds[i].b].value = keys[i].i.toString()+'|'+encrypt.encrypt(form[pwds[i].a].value);
-					form[pwds[i].a].value = '';
+					if(form[pwds[i].a] !== undefined){
+						form[pwds[i].b].value = keys[i].i.toString()+'|'+encrypt.encrypt(form[pwds[i].a].value);
+						form[pwds[i].a].value = '';
+					}
 				}
 				form.submit();
 			}
