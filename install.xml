@@ -261,7 +261,7 @@
 	$_POST['u'] = (int) $_POST['u'];
 ]]></search>
 			<add><![CDATA[	require_once($sourcedir.'/Subs-Auth.php');
-	getRSAFromPost(array('passwrd1','passwrd2','secret_answer'));]]></add>
+	getRSAFromPost(array('passwrd1','passwrd2'));]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Security.php">
