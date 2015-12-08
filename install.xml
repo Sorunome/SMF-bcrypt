@@ -62,6 +62,27 @@
 				}
 			}]]></add>
 		</operation>
+		<operation>
+			<search position="replace"><![CDATA[			// If it was *at least* five hours ago...
+			if ($visitTime < time() - 5 * 3600)
+			{
+				updateMemberData($id_member, array('id_msg_last_visit' => (int) $modSettings['maxMsgID'], 'last_login' => time(), 'member_ip' => $_SERVER['REMOTE_ADDR'], 'member_ip2' => $_SERVER['BAN_CHECK_IP']));]]></search>
+			<add><![CDATA[			// If it was *at least* five hours ago...
+			if ($visitTime < time() - 5 * 3600)
+			{
+				$array = safe_unserialize($user_settings['cookie_hash']);
+				if($cookie_id!=-1){
+					$array[$cookie_id]['e'] = min(60*60*150 + time(),$array[$cookie_id]['t']);
+					$len = sizeof($array);
+					foreach($array as $i => $v){
+						if($v['e'] < time()){
+							unset($array[$i]);
+						}
+					}
+				}
+				
+				updateMemberData($id_member, array('id_msg_last_visit' => (int) $modSettings['maxMsgID'], 'last_login' => time(), 'member_ip' => $_SERVER['REMOTE_ADDR'], 'member_ip2' => $_SERVER['BAN_CHECK_IP'],'cookie_hash' => serialize($array)));]]></add>
+		</operation>
 	</file>
 	<file name="$sourcedir/LogInOut.php">
 		<operation>
@@ -512,6 +533,7 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 		$password = bin2hex(openssl_random_pseudo_bytes(16));
 		$carray[$cid] = array(
 			't' => $cookie_length + time(),
+			'e' => time() + min($cookie_length,60*60*150),
 			'p' => password_hash($password,PASSWORD_DEFAULT)
 		);
 		updateMemberData($id,array('cookie_hash' => serialize($carray)));
