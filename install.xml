@@ -58,7 +58,7 @@
 				if($cookie_id!=-1 && $login_span > time())
 				{
 					$array = safe_unserialize($user_settings['cookie_hash']);
-					$check = $array && isset($array[$cookie_id]) && $array[$cookie_id]['t'] > time() && password_verify($password,$array[$cookie_id]['p']);
+					$check = $array && isset($array[$cookie_id]) && $array[$cookie_id]['t'] > time() && password_verify($smcFunc['strtolower']($user_settings['member_name']).$password,$array[$cookie_id]['p']);
 				}
 			}]]></add>
 		</operation>
@@ -143,7 +143,7 @@
 		$_POST['passwrd'] = getRSAValue(array($_POST['hash_passwrd']))[0];
 	}
 	
-	if (!password_verify(un_htmlspecialchars($_POST['passwrd']),$user_settings['passwd'])){]]></add>
+	if (!password_verify($smcFunc['strtolower']($user_settings['member_name']).un_htmlspecialchars($_POST['passwrd']),$user_settings['passwd'])){]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[			$user_settings['passwd'] = $sha_passwd;
@@ -152,7 +152,7 @@
 			// Update the password and set up the hash.
 			updateMemberData($user_settings['id_member'], array('passwd' => $user_settings['passwd'], 'password_salt' => $user_settings['password_salt'], 'passwd_flood' => ''));]]></search>
 			<add><![CDATA[			// Update the password and set up the hash
-			updateMemberData($user_settings['id_member'], array('passwd' => password_hash(un_htmlspecialchars($_POST['passwrd']),PASSWORD_DEFAULT), 'password_salt' => '', 'passwd_flood' => ''));]]></add>
+			updateMemberData($user_settings['id_member'], array('passwd' => password_hash($smcFunc['strtolower']($user_settings['member_name']).un_htmlspecialchars($_POST['passwrd']),PASSWORD_DEFAULT), 'password_salt' => '', 'passwd_flood' => ''));]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[	setLoginCookie(60 * $modSettings['cookieTime'], $user_settings['id_member'], sha1($user_settings['passwd'] . $user_settings['password_salt']));]]></search>
@@ -283,7 +283,7 @@ function getRSAValue($crypt_unparsed){
 	<file name="$sourcedir/Register.php">
 		<operation>
 			<search position="replace"><![CDATA[sha1(strtolower($row['member_name']) . $_REQUEST['passwd']) == $row['passwd']]]></search>
-			<add><![CDATA[password_verify($_REQUEST['passwd'],$row['passwd'])]]></add>
+			<add><![CDATA[password_verify($smcFunc['strtolower']($row['member_name']).$_REQUEST['passwd'],$row['passwd'])]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[$_POST['secret_answer'] = md5($_POST['secret_answer']);]]></search>
@@ -300,11 +300,11 @@ function getRSAValue($crypt_unparsed){
 	<file name="$sourcedir/Reminder.php">
 		<operation>
 			<search postion="replace"><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => sha1(strtolower($username) . $_POST['passwrd1'])));]]></search>
-			<add><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => password_hash($_POST['passwrd1'],PASSWORD_DEFAULT)));]]></add>
+			<add><![CDATA[updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => password_hash($smcFunc['strtolower']($username).$_POST['passwrd1'],PASSWORD_DEFAULT)));]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[updateMemberData($row['id_member'], array('passwd' => sha1(strtolower($row['member_name']) . $_POST['passwrd1'])));]]></search>
-			<add><![CDATA[updateMemberData($row['id_member'], array('passwd' => password_hash($_POST['passwrd1'],PASSWORD_DEFAULT)));]]></add>
+			<add><![CDATA[updateMemberData($row['id_member'], array('passwd' => password_hash($smcFunc['strtolower']($row['member_name']).$_POST['passwrd1'],PASSWORD_DEFAULT)));]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])]]></search>
@@ -331,23 +331,23 @@ function getRSAValue($crypt_unparsed){
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[sha1(strtolower($user_info['username']) . $_POST['admin_pass']) == $user_info['passwd']]]></search>
-			<add><![CDATA[password_verify($_POST['admin_pass'],$user_info['passwd'])]]></add>
+			<add><![CDATA[password_verify($smcFunc['strtolower']($user_info['username']).$_POST['admin_pass'],$user_info['passwd'])]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Profile.php">
 		<operation>
 			<search position="replace"><![CDATA[if (!$good_password && $user_info['passwd'] != sha1(strtolower($cur_profile['member_name']) . $_POST['oldpasswrd']))]]></search>
-			<add><![CDATA[if (!$good_password && !password_verify($_POST['oldpasswrd'],$user_info['passwd']))]]></add>
+			<add><![CDATA[if (!$good_password && !password_verify($smcFunc['strtolower']($cur_profile['member_name']).$_POST['oldpasswrd'],$user_info['passwd']))]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Profile-Modify.php">
 		<operation>
 			<search position="replace"><![CDATA[$value = sha1(strtolower($cur_profile[\'member_name\']) . un_htmlspecialchars($value));]]></search>
-			<add><![CDATA[$value = password_hash(un_htmlspecialchars($value),PASSWORD_DEFAULT);]]></add>
+			<add><![CDATA[$value = password_hash($smcFunc[\'strtolower\']($cur_profile[\'member_name\']).un_htmlspecialchars($value),PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[$passwd = sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd1']));]]></search>
-			<add><![CDATA[$passwd = password_hash(un_htmlspecialchars($_POST['passwrd1']),PASSWORD_DEFAULT);]]></add>
+			<add><![CDATA[$passwd = password_hash($smcFunc['strtolower']($cur_profile['member_name']).un_htmlspecialchars($_POST['passwrd1']),PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replaced"><![CDATA[
@@ -374,7 +374,7 @@ function getRSAValue($crypt_unparsed){
 		<operation>
 			<search position="replace"><![CDATA['passwd' => sha1(strtolower($regOptions['username']) . $regOptions['password']),
 		'password_salt' => substr(md5(mt_rand()), 0, 4) ,]]></search>
-			<add><![CDATA['passwd' => password_hash($regOptions['password'],PASSWORD_DEFAULT),
+			<add><![CDATA['passwd' => password_hash($smcFunc['strtolower']($regOptions['username']).$regOptions['password'],PASSWORD_DEFAULT),
 		'password_salt' => '' ,]]></add>
 		</operation>
 	</file>
@@ -458,7 +458,7 @@ function getRSAValue($crypt_unparsed){
 	<file name="$sourcedir/Subs-Auth.php">
 		<operation>
 			<search position="replace"><![CDATA[$newPassword_sha1 = sha1(strtolower($user) . $newPassword);]]></search>
-			<add><![CDATA[$newPassword_sha1 = password_hash($newPassword,PASSWORD_DEFAULT);]]></add>
+			<add><![CDATA[$newPassword_sha1 = password_hash($smcFunc['strtolower']($user).$newPassword,PASSWORD_DEFAULT);]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[// Actually set the login cookie...
