@@ -8,7 +8,7 @@
 			<search position="before"><![CDATA[
 		'restoretopic' => array('RemoveTopic.php', 'RestoreTopic'),]]></search>
 			<add><![CDATA[
-		'rsakeys' => array('LogInOut.php', 'getRSAKeys'),]]></add>
+		'rsakeys' => array('Subs-Auth.php', 'getRSAKeys'),]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Load.php">
@@ -203,82 +203,6 @@
 			SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt, openid_uri,
 			passwd_flood, cookie_hash]]></add>
 		</operation>
-		<operation>
-			<search position="end" />
-			<add><![CDATA[
-function getRSAKeys(){
-	global $smcFunc;
-	header('Content-Type:application/json');
-	$ret = array();
-	for($i = 0;$i < (int)$_GET['num'];$i++){
-		
-		$res = openssl_pkey_new();
-		openssl_pkey_export($res,$privKey);
-		$pubKey = openssl_pkey_get_details($res);
-		$pubKey = $pubKey['key'];
-		
-		$smcFunc['db_insert']('insert',
-			'{db_prefix}rsa_keys',
-			array(
-				'privKey' => 'string', 'pubKey' => 'string'
-			),
-			array($privKey,$pubKey),
-			array('privKey','pubKey')
-		);
-		$ret[] = array(
-			'i' => $smcFunc['db_insert_id']('{db_prefix}rsa_keys','key_id'),
-			'key' => $pubKey
-		);
-	}
-	
-	echo json_encode($ret);
-	exit;
-}
-
-function getRSAValue($crypt_unparsed){
-	global $smcFunc;
-	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE ts < (NOW() - INTERVAL 1 MINUTE)');
-	$crypt = array();
-	$fetchKeys = array();
-	foreach($crypt_unparsed as $c){
-		$c = explode('|',$c,2);
-		if(sizeof($c) != 2 || in_array((int)$c[0],$fetchKeys)){
-			$crypt[] = array(
-				'i' => -1,
-				'val' => ''
-			);
-		}else{
-			$crypt[] = array(
-				'i' => (int)$c[0],
-				'val' => $c[1]
-			);
-			$fetchKeys[] = (int)$c[0];
-		}
-	}
-	$dbKeys = array();
-	$request = $smcFunc['db_query']('','SELECT key_id,privKey FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
-	while($res = $smcFunc['db_fetch_assoc']($request)){
-		$dbKeys[(int)$res['key_id']] = $res['privKey'];
-	}
-	$smcFunc['db_free_result']($request);
-	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
-	
-	$cryptRet = array();
-	foreach($crypt as $c){
-		if($c['i'] == -1 || !isset($dbKeys[$c['i']])){
-			$cryptRet[] = '';
-		}else{
-			if(openssl_private_decrypt(base64_decode($c['val']),$plain,openssl_get_privatekey($dbKeys[$c['i']]))){
-				$cryptRet[] = $plain;
-			}else{
-				$cryptRet[] = '';
-			}
-		}
-	}
-	return $cryptRet;
-}
-]]></add>
-		</operation>
 	</file>
 	<file name="$sourcedir/Register.php">
 		<operation>
@@ -309,6 +233,13 @@ function getRSAValue($crypt_unparsed){
 		<operation>
 			<search position="replace"><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])]]></search>
 			<add><![CDATA[if ($row['secret_question'] == '' || $row['secret_answer'] == '' || !password_verify($_POST['secret_answer'],$row['secret_answer']))]]></add>
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[$possible_strings = array_diff($possible_strings, $exclude_fields);
+	$possible_ints = array_diff($possible_ints, $exclude_fields);
+	$possible_floats = array_diff($possible_floats, $exclude_fields);
+	$possible_bools = array_diff($possible_bools, $exclude_fields);]]></search>
+			<add><![CDATA[]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Security.php">
@@ -455,6 +386,13 @@ function getRSAValue($crypt_unparsed){
 	echo '<form action="', $scripturl, $context['get_data'], '" method="post" accept-charset="', $context['character_set'], '" name="frmLogin" id="frmLogin" onsubmit="return rsaFormPasswords(this, [{a:\'admin_pass\',b:\'admin_hash_pass\'}]);">]]></add>
 		</operation>
 	</file>
+	<file name="$themedir/Register.template.php">
+		<operation>
+			<search position="replace"><![CDATA[<form action="', $scripturl, '?action=register2" method="post" accept-charset="', $context['character_set'], '" name="registration" id="registration" onsubmit="return verifyAgree();">]]></search>
+			<add><![CDATA[<form action="', $scripturl, '?action=register2" method="post" accept-charset="', $context['character_set'], '" name="registration" id="registration" onsubmit="',empty($context['disable_login_hashing'])?'return verifyAgree() && rsaFormPasswords(this,[{a:\'passwrd1\',b:\'passwrd1_hash\'},{a:\'passwrd2\',b:\'passwrd2_hash\'}]);':'return verifyAgree();','">
+				<input type="hidden" name="passwrd1_hash" value="" /><input type="hidden" name="passwrd2_hash" value="" />]]></add>
+		</operation>
+	</file>
 	<file name="$sourcedir/Subs-Auth.php">
 		<operation>
 			<search position="replace"><![CDATA[$newPassword_sha1 = sha1(strtolower($user) . $newPassword);]]></search>
@@ -542,6 +480,82 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 	// Get the data and path to set it on.
 	$data = serialize($password=='' ? array(0, '', 0, -1, 0) : array($id, $password, $cookie_length + time(), $cookie_state, $cid));
 	$cookie_url = url_parts(!empty($modSettings['localCookies']), !empty($modSettings['globalCookies']));]]></add>
+		</operation>
+		<operation>
+			<search position="end" />
+			<add><![CDATA[
+function getRSAKeys(){
+	global $smcFunc;
+	header('Content-Type:application/json');
+	$ret = array();
+	for($i = 0;$i < (int)$_GET['num'];$i++){
+		
+		$res = openssl_pkey_new();
+		openssl_pkey_export($res,$privKey);
+		$pubKey = openssl_pkey_get_details($res);
+		$pubKey = $pubKey['key'];
+		
+		$smcFunc['db_insert']('insert',
+			'{db_prefix}rsa_keys',
+			array(
+				'privKey' => 'string', 'pubKey' => 'string'
+			),
+			array($privKey,$pubKey),
+			array('privKey','pubKey')
+		);
+		$ret[] = array(
+			'i' => $smcFunc['db_insert_id']('{db_prefix}rsa_keys','key_id'),
+			'key' => $pubKey
+		);
+	}
+	
+	echo json_encode($ret);
+	exit;
+}
+
+function getRSAValue($crypt_unparsed){
+	global $smcFunc;
+	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE ts < (NOW() - INTERVAL 1 MINUTE)');
+	$crypt = array();
+	$fetchKeys = array();
+	foreach($crypt_unparsed as $c){
+		$c = explode('|',$c,2);
+		if(sizeof($c) != 2 || in_array((int)$c[0],$fetchKeys)){
+			$crypt[] = array(
+				'i' => -1,
+				'val' => ''
+			);
+		}else{
+			$crypt[] = array(
+				'i' => (int)$c[0],
+				'val' => $c[1]
+			);
+			$fetchKeys[] = (int)$c[0];
+		}
+	}
+	$dbKeys = array();
+	$request = $smcFunc['db_query']('','SELECT key_id,privKey FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
+	while($res = $smcFunc['db_fetch_assoc']($request)){
+		$dbKeys[(int)$res['key_id']] = $res['privKey'];
+	}
+	$smcFunc['db_free_result']($request);
+	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
+	
+	$cryptRet = array();
+	foreach($crypt as $c){
+		if($c['i'] == -1 || !isset($dbKeys[$c['i']])){
+			$cryptRet[] = '';
+		}else{
+			if(openssl_private_decrypt(base64_decode($c['val']),$plain,openssl_get_privatekey($dbKeys[$c['i']]))){
+				$cryptRet[] = $plain;
+			}else{
+				$cryptRet[] = '';
+			}
+		}
+	}
+	return $cryptRet;
+}
+]]></add>
 		</operation>
 	</file>
 	<file name="$themedir/scripts/script.js">
