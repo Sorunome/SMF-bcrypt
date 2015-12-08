@@ -58,7 +58,7 @@
 				if($cookie_id!=-1 && $login_span > time())
 				{
 					$array = safe_unserialize($user_settings['cookie_hash']);
-					$check = $array && isset($array[$cookie_id]) && $array[$cookie_id]['t'] > time() && password_verify($smcFunc['strtolower']($user_settings['member_name']).$password,$array[$cookie_id]['p']);
+					$check = $array && isset($array[$cookie_id]) && $array[$cookie_id]['t'] > time() && password_verify($password,$array[$cookie_id]['p']);
 				}
 			}]]></add>
 		</operation>
