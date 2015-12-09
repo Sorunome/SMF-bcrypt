@@ -676,7 +676,7 @@ function rsaFormPasswords(form,pwds){
 	if(typeof JSEncrypt == 'undefined'){
 		var s = document.createElement('script');
 		s.type = 'text/javascript';
-		s.src = smf_theme_url+'/scripts/jsencrypt.min.js';
+		s.src = smf_scripturl.substr(0,smf_scripturl.length - ('index.php').length)+'Themes/default/scripts/jsencrypt.min.js';
 		s.onload = callback;
 		document.getElementsByTagName('head')[0].appendChild(s);
 	}else{
