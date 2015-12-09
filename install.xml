@@ -164,14 +164,16 @@
 	setLoginCookie(-3600, 0);]]></search>
 			<add><![CDATA[
 	global $cookiename;
-	$array = safe_unserialize($_COOKIE[$cookiename]);
-	if(isset($array[4]) && !empty($user_info['id']))
-	{
-		$carray = safe_unserialize($user_settings['cookie_hash']);
-		if(isset($carray[$array[4]]))
-		{
-			unset($carray[$array[4]]);
-			updateMemberData($user_info['id'],array('cookie_hash' => serialize($carray)));
+	if(isset($_REQUEST['allpcs'])){
+		updateMemberData($user_info['id'],array('cookie_hash' => ''));
+	}else{
+		$array = safe_unserialize($_COOKIE[$cookiename]);
+		if(isset($array[4]) && !empty($user_info['id'])){
+			$carray = safe_unserialize($user_settings['cookie_hash']);
+			if(isset($carray[$array[4]])){
+				unset($carray[$array[4]]);
+				updateMemberData($user_info['id'],array('cookie_hash' => serialize($carray)));
+			}
 		}
 	}]]></add>
 		</operation>
@@ -682,6 +684,51 @@ function rsaFormPasswords(form,pwds){
 	}
 	return false;
 }
+]]></add>
+		</operation>
+	</file>
+	<file name="$sourcedir/Subs.php">
+		<operation>
+			<search position="before"><![CDATA['logout' => array(
+				'title' => $txt['logout'],
+				'href' => $scripturl . '?action=logout;%1$s=%2$s',
+				'show' => !$user_info['is_guest'],
+				'sub_buttons' => array(]]></search>
+			<add><![CDATA[
+					array(
+						'title' => $txt['logout_local'],
+						'href' => $cripturl . '?action=logout;%1$s=%2$s',
+						'show' => !$user_info['is_guest'],
+						'sub_buttons' => array(),
+						'is_last' => false,
+					),
+					array(
+						'title' => $txt['logout_all'],
+						'href' => $cripturl . '?action=logout;allpcs;%1$s=%2$s',
+						'show' => !$user_info['is_guest'],
+						'sub_buttons' => array(),
+						'is_last' => true,
+					),]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[	// Logging out requires the session id in the url.
+	if (isset($context['menu_buttons']['logout']))
+		$context['menu_buttons']['logout']['href'] = sprintf($context['menu_buttons']['logout']['href'], $context['session_var'], $context['session_id']);]]></search>
+			<add><![CDATA[	// Logging out requires the session id in the url.
+	if (isset($context['menu_buttons']['logout'])){
+		$context['menu_buttons']['logout']['href'] = sprintf($context['menu_buttons']['logout']['href'], $context['session_var'], $context['session_id']);
+		foreach($context['menu_buttons']['logout']['sub_buttons'] as &$b){
+			$b['href'] = sprintf($b['href'], $context['session_var'], $context['session_id']);
+		}
+	}]]></add>
+		</operation>
+	</file>
+	<file name="$languagedir/index.english.php">
+		<operation>
+			<search position="end" />
+			<add><![CDATA[
+$txt['logout_local'] = 'Logout from this PC';
+$txt['logout_all'] = 'Logout from all PCs';
 ]]></add>
 		</operation>
 	</file>
