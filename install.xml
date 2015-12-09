@@ -697,14 +697,14 @@ function rsaFormPasswords(form,pwds){
 			<add><![CDATA[
 					array(
 						'title' => $txt['logout_local'],
-						'href' => $cripturl . '?action=logout;%1$s=%2$s',
+						'href' => $scripturl . '?action=logout;%1$s=%2$s',
 						'show' => !$user_info['is_guest'],
 						'sub_buttons' => array(),
 						'is_last' => false,
 					),
 					array(
 						'title' => $txt['logout_all'],
-						'href' => $cripturl . '?action=logout;allpcs;%1$s=%2$s',
+						'href' => $scripturl . '?action=logout;allpcs;%1$s=%2$s',
 						'show' => !$user_info['is_guest'],
 						'sub_buttons' => array(),
 						'is_last' => true,
