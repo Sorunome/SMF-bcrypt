@@ -8,12 +8,14 @@
 
 	<install for="2.0.11 - 2.99.99">
 		<modification>install.xml</modification>
+		<require-file name="Subs-Password.php" destination="$sourcedir" />
 		<require-file name="jsencrypt.min.js" destination="$themedir/scripts" />
 		<database>database.php</database>
 	</install>
 
 	<uninstall for="2.0.11 - 2.99.99">
 		<modification type="file" reverse="true">install.xml</modification>
+		<remove-file name="$sourcedir/Subs-Password.php" />
 		<remove-file name="$themedir/scripts/jsencrypt.min.js" />
 	</uninstall>
 </package-info>

@@ -6,12 +6,26 @@
 	<file name="$boarddir/index.php">
 		<operation>
 			<search position="before"><![CDATA[
+require_once($sourcedir . '/Subs.php');]]></search>
+			<add><![CDATA[
+require_once($sourcedir . '/Subs-Password.php');]]></add>
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[
 		'restoretopic' => array('RemoveTopic.php', 'RestoreTopic'),]]></search>
 			<add><![CDATA[
 		'rsakeys' => array('Subs-Auth.php', 'getRSAKeys'),]]></add>
 		</operation>
 	</file>
 	<file name="$sourcedir/Load.php">
+		<operation>
+			<search position="after"><![CDATA[
+	// Call pre load integration functions.
+	call_integration_hook('integrate_pre_load');]]></search>
+			<add><![CDATA[
+	$context['disable_login_hashing'] = empty($context['disable_login_hashing']) && function_exists('openssl_pkey_get_details') ? '' : '1';
+]]></add>
+		</operation>
 		<operation>
 			<search position="replace"><![CDATA[	if (empty($id_member) && isset($_COOKIE[$cookiename]))
 	{
@@ -140,7 +154,8 @@
 	{]]></search>
 			<add><![CDATA[
 	if(!empty($_POST['hash_passwrd'])){
-		$_POST['passwrd'] = getRSAValue(array($_POST['hash_passwrd']))[0];
+		$_POST['passwrd'] = getRSAValue(array($_POST['hash_passwrd']));
+		$_POST['passwrd'] = $_POST['passwrd'][0];
 	}
 	
 	if (!password_verify($smcFunc['strtolower']($user_settings['member_name']).un_htmlspecialchars($_POST['passwrd']),$user_settings['passwd'])){]]></add>
@@ -153,6 +168,19 @@
 			updateMemberData($user_settings['id_member'], array('passwd' => $user_settings['passwd'], 'password_salt' => $user_settings['password_salt'], 'passwd_flood' => ''));]]></search>
 			<add><![CDATA[			// Update the password and set up the hash
 			updateMemberData($user_settings['id_member'], array('passwd' => password_hash($smcFunc['strtolower']($user_settings['member_name']).un_htmlspecialchars($_POST['passwrd']),PASSWORD_DEFAULT), 'password_salt' => '', 'passwd_flood' => ''));]]></add>
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[// Correct password, but they've got no salt; fix it!
+	if ($user_settings['password_salt'] == '')
+	{
+		$user_settings['password_salt'] = substr(md5(mt_rand()), 0, 4);
+		updateMemberData($user_settings['id_member'], array('password_salt' => $user_settings['password_salt']));
+	}]]></search>
+	<add><![CDATA[// Check if hash needs updating
+	if (password_needs_rehash($user_settings['passwd'],PASSWORD_DEFAULT))
+	{
+		updateMemberData($user_settings['id_member'], array('passwd' => password_hash($smcFunc['strtolower']($user_settings['member_name']).un_htmlspecialchars($_POST['passwrd']),PASSWORD_DEFAULT)));
+	}]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[	setLoginCookie(60 * $modSettings['cookieTime'], $user_settings['id_member'], sha1($user_settings['passwd'] . $user_settings['password_salt']));]]></search>
@@ -283,7 +311,8 @@
 		}
 	}]]></search>
 			<add><![CDATA[	if(isset($_POST['admin_hash_pass'])){
-		$_POST['admin_pass'] = getRSAValue(array($_POST['admin_hash_pass']))[0];
+		$_POST['admin_pass'] = getRSAValue(array($_POST['admin_hash_pass']));
+		$_POST['admin_pass'] = $_POST['admin_pass'][0];
 	}]]></add>
 		</operation>
 		<operation>
@@ -531,7 +560,14 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 			
 			for($cid = 0;isset($carray[$cid]);$cid++);
 		}
-		$password = bin2hex(openssl_random_pseudo_bytes(16));
+		if(function_exists('openssl_random_pseudo_bytes')){
+			$password = bin2hex(openssl_random_pseudo_bytes(32));
+		}else{
+			for ($i = 0; $i < 32; $i++) {
+				$password .= chr(mt_rand(0, 255));
+			}
+			$password = bin2hex($password);
+		}
 		$carray[$cid] = array(
 			't' => $cookie_length + time(),
 			'e' => time() + min($cookie_length,60*60*150),
@@ -609,7 +645,7 @@ function getRSAValue($crypt_unparsed){
 		if($c['i'] == -1 || !isset($dbKeys[$c['i']])){
 			$cryptRet[] = '';
 		}else{
-			if(openssl_private_decrypt(base64_decode($c['val']),$plain,openssl_get_privatekey($dbKeys[$c['i']]))){
+			if(openssl_private_decrypt(base64_decode($c['val']),$plain,openssl_pkey_get_private($dbKeys[$c['i']]))){
 				$cryptRet[] = $plain;
 			}else{
 				$cryptRet[] = '';
@@ -720,6 +756,17 @@ function rsaFormPasswords(form,pwds){
 		foreach($context['menu_buttons']['logout']['sub_buttons'] as &$b){
 			$b['href'] = sprintf($b['href'], $context['session_var'], $context['session_id']);
 		}
+	}]]></add>
+		</operation>
+		<operation>
+			<search position="before"><![CDATA[// Ends execution.  Takes care of template loading and remembering the previous URL.
+function obExit($header = null, $do_footer = null, $from_index = false, $from_fatal_error = false)
+{
+	global $context, $settings, $modSettings, $txt, $smcFunc;
+	static $header_done = false, $footer_done = false, $level = 0, $has_fatal_error = false;]]></search>
+			<add><![CDATA[
+	if(empty($context['disable_login_hashing']) && !function_exists('openssl_pkey_get_details')){
+		$context['disable_login_hashing'] = true;
 	}]]></add>
 		</operation>
 	</file>
