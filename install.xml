@@ -85,11 +85,14 @@ require_once($sourcedir . '/Subs-Password.php');]]></add>
 			if ($visitTime < time() - 5 * 3600)
 			{
 				$array = safe_unserialize($user_settings['cookie_hash']);
-				if($cookie_id!=-1){
+				if ($cookie_id != -1)
+				{
 					$array[$cookie_id]['e'] = min(60*60*150 + time(),$array[$cookie_id]['t']);
 					$len = sizeof($array);
-					foreach($array as $i => $v){
-						if($v['e'] < time()){
+					foreach ($array as $i => $v)
+					{
+						if ($v['e'] < time())
+						{
 							unset($array[$i]);
 						}
 					}
@@ -153,12 +156,14 @@ require_once($sourcedir . '/Subs-Password.php');]]></add>
 	if ($user_settings['passwd'] != $sha_passwd)
 	{]]></search>
 			<add><![CDATA[
-	if(!empty($_POST['hash_passwrd'])){
+	if (!empty($_POST['hash_passwrd']))
+	{
 		$_POST['passwrd'] = getRSAValue(array($_POST['hash_passwrd']));
 		$_POST['passwrd'] = $_POST['passwrd'][0];
 	}
 	
-	if (!password_verify($smcFunc['strtolower']($user_settings['member_name']).un_htmlspecialchars($_POST['passwrd']),$user_settings['passwd'])){]]></add>
+	if (!password_verify($smcFunc['strtolower']($user_settings['member_name']).un_htmlspecialchars($_POST['passwrd']),$user_settings['passwd']))
+	{]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[			$user_settings['passwd'] = $sha_passwd;
@@ -192,13 +197,18 @@ require_once($sourcedir . '/Subs-Password.php');]]></add>
 	setLoginCookie(-3600, 0);]]></search>
 			<add><![CDATA[
 	global $cookiename;
-	if(isset($_REQUEST['allpcs'])){
+	if (isset($_REQUEST['allpcs']))
+	{
 		updateMemberData($user_info['id'],array('cookie_hash' => ''));
-	}else{
+	}
+	else
+	{
 		$array = safe_unserialize($_COOKIE[$cookiename]);
-		if(isset($array[4]) && !empty($user_info['id'])){
+		if (isset($array[4]) && !empty($user_info['id']))
+		{
 			$carray = safe_unserialize($user_settings['cookie_hash']);
-			if(isset($carray[$array[4]])){
+			if (isset($carray[$array[4]]))
+			{
 				unset($carray[$array[4]]);
 				updateMemberData($user_info['id'],array('cookie_hash' => serialize($carray)));
 			}
@@ -271,12 +281,27 @@ require_once($sourcedir . '/Subs-Password.php');]]></add>
 		</operation>
 		<operation>
 			<search position="replace"><![CDATA[	// Check if the secret answer is correct.
-	if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])]]></search>
+	if ($row['secret_question'] == '' || $row['secret_answer'] == '' || md5($_POST['secret_answer']) != $row['secret_answer'])
+	{
+		log_error(sprintf($txt['reminder_error'], $row['member_name']), 'user');
+		fatal_lang_error('incorrect_answer', false);
+	}]]></search>
 			<add><![CDATA[
 	require_once($sourcedir.'/Subs-Auth.php');
 	getRSAFromPost(array('passwrd1','passwrd2','secret_answer'));
 	// Check if the secret answer is correct.
-	if ($row['secret_question'] == '' || $row['secret_answer'] == '' || !password_verify($_POST['secret_answer'],$row['secret_answer']))]]></add>
+	if ($row['secret_question'] == '' || $row['secret_answer'] == '' || !password_verify($_POST['secret_answer'],$row['secret_answer']))
+	{
+		if ($row['secret_question'] != '' && $row['secret_answer'] != '' && md5($_POST['secret_answer']) == $row['secret_answer'])
+		{
+			updateMemberData($row['id_member'], array('secret_answer' => password_hash($_POST['secret_answer'],PASSWORD_DEFAULT)));
+		}
+		else
+		{
+			log_error(sprintf($txt['reminder_error'], $row['member_name']), 'user');
+			fatal_lang_error('incorrect_answer', false);
+		}
+	}]]></add>
 		</operation>
 		<operation>
 			<search position="before"><![CDATA[function setPassword2()
@@ -310,7 +335,8 @@ require_once($sourcedir . '/Subs-Password.php');]]></add>
 			return;
 		}
 	}]]></search>
-			<add><![CDATA[	if(isset($_POST['admin_hash_pass'])){
+			<add><![CDATA[	if (isset($_POST['admin_hash_pass']))
+	{
 		$_POST['admin_pass'] = getRSAValue(array($_POST['admin_hash_pass']));
 		$_POST['admin_pass'] = $_POST['admin_pass'][0];
 	}]]></add>
@@ -538,9 +564,9 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 		}
 	}
 	$password = '';
-	if($cid !== false && !empty($id) && $id == $user_settings['id_member'])
+	if ($cid !== false && !empty($id) && $id == $user_settings['id_member'])
 	{
-		if($carray = safe_unserialize($user_settings['cookie_hash']))
+		if ($carray = safe_unserialize($user_settings['cookie_hash']))
 		{
 			if(isset($array[$cid]))
 			{
@@ -551,7 +577,7 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 		{
 			$carray = array();
 		}
-		if($cid == -1)
+		if ($cid == -1)
 		{
 			if(!empty($array) && isset($carray[$array[4]])) // we don't need any old stuff clogging the DB
 			{
@@ -560,10 +586,14 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 			
 			for($cid = 0;isset($carray[$cid]);$cid++);
 		}
-		if(function_exists('openssl_random_pseudo_bytes')){
+		if (function_exists('openssl_random_pseudo_bytes'))
+		{
 			$password = bin2hex(openssl_random_pseudo_bytes(32));
-		}else{
-			for ($i = 0; $i < 32; $i++) {
+		}
+		else
+		{
+			for ($i = 0; $i < 32; $i++)
+			{
 				$password .= chr(mt_rand(0, 255));
 			}
 			$password = bin2hex($password);
@@ -583,12 +613,13 @@ function setLoginCookie($cookie_length, $id, $cid = false)
 		<operation>
 			<search position="end" />
 			<add><![CDATA[
-function getRSAKeys(){
+function getRSAKeys()
+{
 	global $smcFunc;
 	header('Content-Type:application/json');
 	$ret = array();
-	for($i = 0;$i < (int)$_GET['num'];$i++){
-		
+	for ($i = 0;$i < (int)$_GET['num'];$i++)
+	{
 		$res = openssl_pkey_new();
 		openssl_pkey_export($res,$privKey);
 		$pubKey = openssl_pkey_get_details($res);
@@ -612,19 +643,23 @@ function getRSAKeys(){
 	exit;
 }
 
-function getRSAValue($crypt_unparsed){
+function getRSAValue($crypt_unparsed)
+{
 	global $smcFunc;
 	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE ts < (NOW() - INTERVAL 1 MINUTE)');
 	$crypt = array();
 	$fetchKeys = array();
 	foreach($crypt_unparsed as $c){
 		$c = explode('|',$c,2);
-		if(sizeof($c) != 2 || in_array((int)$c[0],$fetchKeys)){
+		if (sizeof($c) != 2 || in_array((int)$c[0],$fetchKeys))
+		{
 			$crypt[] = array(
 				'i' => -1,
 				'val' => ''
 			);
-		}else{
+		}
+		else
+		{
 			$crypt[] = array(
 				'i' => (int)$c[0],
 				'val' => $c[1]
@@ -634,20 +669,28 @@ function getRSAValue($crypt_unparsed){
 	}
 	$dbKeys = array();
 	$request = $smcFunc['db_query']('','SELECT key_id,privKey FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
-	while($res = $smcFunc['db_fetch_assoc']($request)){
+	while ($res = $smcFunc['db_fetch_assoc']($request))
+	{
 		$dbKeys[(int)$res['key_id']] = $res['privKey'];
 	}
 	$smcFunc['db_free_result']($request);
 	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
 	
 	$cryptRet = array();
-	foreach($crypt as $c){
-		if($c['i'] == -1 || !isset($dbKeys[$c['i']])){
+	foreach ($crypt as $c)
+	{
+		if ($c['i'] == -1 || !isset($dbKeys[$c['i']]))
+		{
 			$cryptRet[] = '';
-		}else{
-			if(openssl_private_decrypt(base64_decode($c['val']),$plain,openssl_pkey_get_private($dbKeys[$c['i']]))){
+		}
+		else
+		{
+			if (openssl_private_decrypt(base64_decode($c['val']),$plain,openssl_pkey_get_private($dbKeys[$c['i']])))
+			{
 				$cryptRet[] = $plain;
-			}else{
+			}
+			else
+			{
 				$cryptRet[] = '';
 			}
 		}
@@ -655,17 +698,22 @@ function getRSAValue($crypt_unparsed){
 	return $cryptRet;
 }
 
-function getRSAFromPost($arr){
+function getRSAFromPost($arr)
+{
 	$decryptArr = array();
 	$decryptVals = array();
-	foreach($arr as $a){
-		if(!empty($_POST[$a.'_hash'])){
+	foreach ($arr as $a)
+	{
+		if (!empty($_POST[$a.'_hash']))
+		{
 			$decryptArr[] = $a;
 			$decryptVals[] = $_POST[$a.'_hash'];
 		}
 	}
-	if(sizeof($decryptVals) > 0){
-		foreach(getRSAValue($decryptVals) as $i => $v){
+	if (sizeof($decryptVals) > 0)
+	{
+		foreach (getRSAValue($decryptVals) as $i => $v)
+		{
 			$_POST[$decryptArr[$i]] = $v;
 		}
 	}
@@ -751,9 +799,11 @@ function rsaFormPasswords(form,pwds){
 	if (isset($context['menu_buttons']['logout']))
 		$context['menu_buttons']['logout']['href'] = sprintf($context['menu_buttons']['logout']['href'], $context['session_var'], $context['session_id']);]]></search>
 			<add><![CDATA[	// Logging out requires the session id in the url.
-	if (isset($context['menu_buttons']['logout'])){
+	if (isset($context['menu_buttons']['logout']))
+	{
 		$context['menu_buttons']['logout']['href'] = sprintf($context['menu_buttons']['logout']['href'], $context['session_var'], $context['session_id']);
-		foreach($context['menu_buttons']['logout']['sub_buttons'] as &$b){
+		foreach ($context['menu_buttons']['logout']['sub_buttons'] as &$b)
+		{
 			$b['href'] = sprintf($b['href'], $context['session_var'], $context['session_id']);
 		}
 	}]]></add>
@@ -765,7 +815,8 @@ function obExit($header = null, $do_footer = null, $from_index = false, $from_fa
 	global $context, $settings, $modSettings, $txt, $smcFunc;
 	static $header_done = false, $footer_done = false, $level = 0, $has_fatal_error = false;]]></search>
 			<add><![CDATA[
-	if(empty($context['disable_login_hashing']) && !function_exists('openssl_pkey_get_details')){
+	if (empty($context['disable_login_hashing']) && !function_exists('openssl_pkey_get_details'))
+	{
 		$context['disable_login_hashing'] = true;
 	}]]></add>
 		</operation>
@@ -777,6 +828,18 @@ function obExit($header = null, $do_footer = null, $from_index = false, $from_fa
 $txt['logout_local'] = 'Logout from this PC';
 $txt['logout_all'] = 'Logout from all PCs';
 ]]></add>
+		</operation>
+	</file>
+	<file name="$boarddir/SSI.php">
+		<operation>
+			<search position="before"><![CDATA[
+require_once($sourcedir . '/Subs.php');]]></search>
+			<add><![CDATA[
+require_once($sourcedir . '/Subs-Password.php');]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[return sha1(strtolower($user) . $password) == $pass && $active == 1;]]></search>
+			<add><![CDATA[return password_verify(strtolower($user) . $password, $pass) && $active == 1;]]></add>
 		</operation>
 	</file>
 </modification>
