@@ -1,0 +1,15 @@
+[size=18pt][b]SMF bcrypt mod[/b][/size]
+You are about to install a mod which [b][u]cannot be uninstalled[/u][/b]!
+This is due to the nature of how password security is working!
+
+Things this mod changes:
+[list]
+[li]Use bcrypt for hashing passwords instead of sha1 (compatible with SMF 2.1)[/li]
+[li]Use RSA for transmitting passwords to the server, thus making sure  passwords are never sent in cleartext (PHP 5.2+)[/li]
+[li]Change the way login cookies work to [u]not[/u] be based off of the password hash[/li]
+[li]Added a "Log out from all PCs" button[/li]
+[/list]
+
+[size=18pt]Licence[/size]
+This mod is to be distributet using GPLv3 or later. (see https://www.gnu.org/licenses/)
+The JavaScript RSA library is by "travist" and can be found here: https://github.com/travist/jsencrypt (MIT licence)

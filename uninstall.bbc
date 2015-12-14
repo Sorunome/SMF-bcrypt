@@ -1,0 +1,11 @@
+[color=red][size=20pt][b]WARNING: This Mod is not meant to be uninstalled!!![/b][/size][/color]
+
+If you still want to uninstall this mod you will have to [u]manually[/u] set an admin password in the SQL to be able to log in as admin! After that you can do whatever you needed to do and re-install this mod!
+In order to generate the hash you can use the following code (fill in the variables at the top):
+[code]
+<?php
+$username = 'YOUR USERNAME HERE';
+$password = 'YOUR PASSWORD HERE';
+echo sha1(strtolower($username).$password);
+?>
+[/code]

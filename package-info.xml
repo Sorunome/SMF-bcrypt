@@ -3,10 +3,11 @@
 <package-info xmlns="http://www.simplemachines.org/xml/package-info" xmlns:smf="http://www.simplemachines.org/">
 	<id>Sorunome:bcrypt</id>
 	<name>Use bcrypt for password auth</name>
-	<version>1.0</version>
+	<version>1.0b</version>
 	<type>modification</type>
 
 	<install for="2.0.11 - 2.99.99">
+		<readme parsebbc="true">install.bbc</readme>
 		<modification>install.xml</modification>
 		<require-file name="Subs-Password.php" destination="$sourcedir" />
 		<require-file name="jsencrypt.min.js" destination="$themedir/scripts" />
@@ -14,6 +15,7 @@
 	</install>
 
 	<uninstall for="2.0.11 - 2.99.99">
+		<readme parsebbc="true">uninstall.bbc</readme>
 		<modification type="file" reverse="true">install.xml</modification>
 		<remove-file name="$sourcedir/Subs-Password.php" />
 		<remove-file name="$themedir/scripts/jsencrypt.min.js" />
