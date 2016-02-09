@@ -646,7 +646,7 @@ function getRSAKeys()
 function getRSAValue($crypt_unparsed)
 {
 	global $smcFunc;
-	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE ts < (NOW() - INTERVAL 1 MINUTE)');
+	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE ts < (NOW() - INTERVAL 5 MINUTE)');
 	$crypt = array();
 	$fetchKeys = array();
 	foreach($crypt_unparsed as $c){
@@ -668,14 +668,16 @@ function getRSAValue($crypt_unparsed)
 		}
 	}
 	$dbKeys = array();
-	$request = $smcFunc['db_query']('','SELECT key_id,privKey FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
-	while ($res = $smcFunc['db_fetch_assoc']($request))
-	{
-		$dbKeys[(int)$res['key_id']] = $res['privKey'];
+	if(sizeof($fetchKeys) > 0){
+		$request = $smcFunc['db_query']('','SELECT key_id,privKey FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
+		while($res = $smcFunc['db_fetch_assoc']($request))
+		{
+			$dbKeys[(int)$res['key_id']] = $res['privKey'];
+		}
+		$smcFunc['db_free_result']($request);
+		$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
 	}
-	$smcFunc['db_free_result']($request);
-	$smcFunc['db_query']('','DELETE FROM {db_prefix}rsa_keys WHERE key_id IN ('.implode(',',$fetchKeys).')');
-	
+
 	$cryptRet = array();
 	foreach ($crypt as $c)
 	{
