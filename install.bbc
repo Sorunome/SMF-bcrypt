@@ -10,6 +10,6 @@ Things this mod changes:
 [li]Added a "Log out from all PCs" button[/li]
 [/list]
 
-[size=18pt]Licence[/size]
+[size=18pt]License[/size]
 This mod is to be distributet using GPLv3 or later. (see https://www.gnu.org/licenses/)
 The JavaScript RSA library is by "travist" and can be found here: https://github.com/travist/jsencrypt (MIT licence)
